@@ -54,21 +54,24 @@
             window.loadFromCloud('rt02_admin_pin', (data) => { if(data) { adminPin = data; } });
             window.loadFromCloud('rt02_petugas', (data) => { if(data) { petugasList = data; initLoginDropdown(); renderPetugas(); } });
             window.loadFromCloud('rt02_warga', (data) => { if(data) { wargaList = data; renderAll(); } });
-            window.loadFromCloud('rt02_jimpitan', (data) => { if(data) { jimpitanData = data; renderJimpitan(); renderKas(); } });
-            window.loadFromCloud('rt02_iuran', (data) => { if(data) { iuranData = data; renderIuran(); renderKas(); } });
-            window.loadFromCloud('rt02_masuk_lain', (data) => { if(data) { kasMasukLain = data; renderKas(); } });
-            window.loadFromCloud('rt02_kas', (data) => { if(data) { kasKeluar = data; renderKas(); } });
+            window.loadFromCloud('rt02_jimpitan', (data) => { if(data) { jimpitanData = data; renderJimpitan(); renderKas(); updateDashboardSummary(); } });
+            window.loadFromCloud('rt02_masuk_lain', (data) => { if(data) { kasMasukLain = data; renderKas(); updateDashboardSummary(); } });
+            window.loadFromCloud('rt02_kas', (data) => { if(data) { kasKeluar = data; renderKas(); updateDashboardSummary(); } });
             window.loadFromCloud('rt02_logs', (data) => { if(data) { activityLogs = data; renderLogs(); } });
         };
 
         window.addEventListener('DOMContentLoaded', () => {
-            const forcedToday = '2026-10-08';
+            const today = new Date().toISOString().split('T')[0];
+            
+            const filterBulan = document.getElementById('filterBulan');
+            if(filterBulan) filterBulan.value = today.slice(0, 7);
+
             const dateInput = document.getElementById('pilihTanggalCek');
-            if(dateInput) dateInput.value = forcedToday;
+            if(dateInput) dateInput.value = today;
             const tglMasuk = document.getElementById('tglMasuk');
-            if(tglMasuk) tglMasuk.value = forcedToday;
+            if(tglMasuk) tglMasuk.value = today;
             const tglKeluar = document.getElementById('tglKeluar');
-            if(tglKeluar) tglKeluar.value = forcedToday;
+            if(tglKeluar) tglKeluar.value = today;
 
             setTimeout(() => {
                 if(typeof window.initFirebaseSync === 'function') {
@@ -79,57 +82,40 @@
     </script>
 
     <style>
+        .fade-in { animation: fadeIn 0.25s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        
+        /* Pengaturan khusus saat cetak PDF atau Print agar warna latar belakang tetap muncul */
         @media print {
-            button, input, select, textarea, .tab-btn, .action-col, #loginModal, form {
-                display: none !important;
-            }
-            body {
-                background: #f8fafc !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            header {
-                background: linear-gradient(to right, #2563eb, #4f46e5, #7c3aed) !important;
-                color: white !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .bg-white {
-                background-color: #ffffff !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .text-emerald-600 {
-                color: #059669 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .text-rose-600 {
-                color: #e11d48 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .max-w-6xl {
-                max-width: 100% !important;
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-            table {
+            body * { visibility: hidden !important; }
+            #captureArea, #captureArea * { visibility: visible !important; }
+            #captureArea {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
                 width: 100% !important;
-                border-collapse: collapse !important;
+                margin: 0 !important;
+                padding: 10px !important;
+                background: #ffffff !important;
+                box-shadow: none !important;
+                border: none !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
-            th, td {
-                border: 1px solid #e2e8f0 !important;
-                padding: 8px !important;
+            .print-bg-blue {
+                background: #2563eb !important;
+                color: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
         }
     </style>
 </head>
-<body class="bg-slate-50 font-sans text-slate-800 antialiased">
+<body class="bg-slate-50 font-sans text-slate-800 antialiased min-h-screen flex flex-col">
 
     <!-- ================= MODAL LOGIN ================= -->
     <div id="loginModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center border border-slate-100">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center border border-slate-100 fade-in">
             <div class="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white w-18 h-18 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/30">
                 <i data-lucide="wallet" class="w-9 h-9"></i>
             </div>
@@ -158,331 +144,359 @@
     </div>
 
     <!-- ================= KONTAINER UTAMA ================= -->
-    <div class="max-w-6xl mx-auto p-4 sm:p-6 pb-28">
+    <div class="max-w-4xl mx-auto p-4 sm:p-6 w-full flex-1 flex flex-col">
         
-        <!-- Header Gaya Modern -->
-        <header class="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 text-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-blue-600/10 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
-            <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-            <div>
-                <span id="roleBadge" class="bg-white/20 backdrop-blur-md text-white text-xs px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider border border-white/20">Mode Warga</span>
-                <h1 id="headerRtName" class="text-2xl sm:text-3xl font-black mt-3 tracking-tight">RT 02 BERSINAR PANJEN LOR</h1>
-                <p id="headerDesaName" class="text-blue-100 text-sm font-medium mt-0.5">Desa Patuguran • Jimpitan & Kas Warga Transparan</p>
-            </div>
-            <div class="flex items-center gap-3 z-10">
-                <span id="activeUserLabel" class="text-xs text-blue-100 font-medium hidden bg-black/20 px-3.5 py-2 rounded-xl border border-white/10">User: -</span>
-            </div>
-        </header>
-
-        <!-- Navigasi Tab Modern -->
-        <div class="flex overflow-x-auto gap-2 mb-6 pb-2 no-scrollbar">
-            <button onclick="switchTab('jimpitan')" id="tabBtn-jimpitan" class="tab-btn px-5 py-3 rounded-2xl font-semibold text-sm bg-blue-600 text-white shadow-md shadow-blue-600/20 transition flex items-center gap-2 whitespace-nowrap">
-                <i data-lucide="calendar-check" class="w-4 h-4"></i> Jimpitan Harian
-            </button>
-            <button onclick="switchTab('iuran')" id="tabBtn-iuran" class="tab-btn px-5 py-3 rounded-2xl font-semibold text-sm bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80 transition flex items-center gap-2 whitespace-nowrap">
-                <i data-lucide="file-text" class="w-4 h-4"></i> Iuran Bulanan
-            </button>
-            <button onclick="switchTab('kas')" id="tabBtn-kas" class="tab-btn px-5 py-3 rounded-2xl font-semibold text-sm bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80 transition flex items-center gap-2 whitespace-nowrap">
-                <i data-lucide="wallet" class="w-4 h-4"></i> Kas & Keuangan
-            </button>
-            <button onclick="switchTab('warga')" id="tabBtn-warga" class="tab-btn px-5 py-3 rounded-2xl font-semibold text-sm bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80 transition flex items-center gap-2 whitespace-nowrap">
-                <i data-lucide="users" class="w-4 h-4"></i> Data Warga (KK)
-            </button>
-            <button onclick="switchTab('pengaturan')" id="tabBtn-pengaturan" class="tab-btn px-5 py-3 rounded-2xl font-semibold text-sm bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80 transition flex items-center gap-2 whitespace-nowrap staff-only hidden">
-                <i data-lucide="settings" class="w-4 h-4"></i> Pengaturan
-            </button>
-        </div>
-
-        <!-- ================= 1. TAB JIMPITAN HARIAN ================= -->
-        <div id="tab-jimpitan" class="tab-content space-y-6">
-            <div class="bg-white rounded-3xl shadow-sm p-5 border border-slate-200/80 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-3 w-full sm:w-auto">
-                    <label class="font-semibold text-xs text-slate-500 uppercase tracking-wider">Pilih Bulan:</label>
-                    <input type="month" id="filterBulan" onchange="renderAll()" class="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50">
-                </div>
-                <div class="w-full sm:w-72">
-                    <input type="text" id="searchWargaJimpitan" oninput="renderJimpitan()" placeholder="🔍 Cari nama warga..." class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
-                </div>
-            </div>
-
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead>
-                        <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
-                            <th class="p-4 sticky left-0 bg-slate-50 z-10">Warga</th>
-                            <th class="p-4">No Rumah</th>
-                        </tr>
-                    </thead>
-                    <tbody id="jimpitanTableBody"></tbody>
-                    <tfoot id="jimpitanTableFoot"></tfoot>
-                </table>
-            </div>
-        </div>
-
-        <!-- ================= 2. TAB IURAN BULANAN ================= -->
-        <div id="tab-iuran" class="tab-content hidden space-y-6">
-            <div class="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/80">
-                <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+        <!-- ================= DASHBOARD UTAMA ================= -->
+        <div id="mainDashboardView" class="fade-in space-y-6">
+            <header class="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 text-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-blue-600/10 relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h3 class="text-xl font-black text-slate-900 tracking-tight">Rekap Iuran Bulanan</h3>
-                        <p class="text-xs text-slate-400 font-medium mt-0.5">Catatan iuran rutin warga (Keamanan & Kebersihan).</p>
+                        <span id="roleBadge" class="bg-white/20 backdrop-blur-md text-white text-xs px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider border border-white/20">Mode Warga</span>
+                        <h1 id="headerRtName" class="text-2xl sm:text-3xl font-black mt-3 tracking-tight">RT 02 BERSINAR PANJEN LOR</h1>
+                        <p id="headerDesaName" class="text-blue-100 text-sm font-medium mt-0.5">Desa Patuguran • Jimpitan & Kas Warga Transparan</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span id="activeUserLabel" class="text-xs text-blue-100 font-medium hidden bg-black/20 px-3.5 py-2 rounded-xl border border-white/10">User: -</span>
+                        <button onclick="logout()" class="text-xs text-white bg-white/10 hover:bg-white/20 px-3.5 py-2 rounded-xl border border-white/20 transition font-medium flex items-center gap-1.5">
+                            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Keluar
+                        </button>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-6 border-t border-white/15">
+                    <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                        <p class="text-xs text-blue-100 font-medium">Akumulasi Saldo Global</p>
+                        <h3 id="dashSaldoAkhir" class="text-xl font-black mt-1">Rp 0</h3>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                        <p class="text-xs text-blue-100 font-medium">Total Pemasukan Bulan Ini</p>
+                        <h3 id="dashPemasukan" class="text-xl font-black mt-1 text-emerald-300">Rp 0</h3>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                        <p class="text-xs text-blue-100 font-medium">Total Pengeluaran Bulan Ini</p>
+                        <h3 id="dashPengeluaran" class="text-xl font-black mt-1 text-rose-300">Rp 0</h3>
+                    </div>
+                </div>
+            </header>
+
+            <nav>
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">Daftar Menu Pilihan</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button onclick="openSubPage('tab-transaksi')" class="flex items-center p-5 rounded-3xl border border-slate-200/80 bg-white hover:border-blue-500 hover:shadow-lg transition group text-left">
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mr-4 group-hover:bg-blue-600 group-hover:text-white transition shrink-0">
+                            <i data-lucide="calendar-check" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base">Pemasukan & Pengeluaran</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Pencatatan jimpitan harian warga.</p>
+                        </div>
+                    </button>
+
+                    <button onclick="openSubPage('tab-kas')" class="flex items-center p-5 rounded-3xl border border-slate-200/80 bg-white hover:border-blue-500 hover:shadow-lg transition group text-left">
+                        <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mr-4 group-hover:bg-emerald-600 group-hover:text-white transition shrink-0">
+                            <i data-lucide="wallet" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base">Kas, Saldo & Keuangan</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Rincian rekap saldo, donasi/pemasukan lain, & kas keluar.</p>
+                        </div>
+                    </button>
+
+                    <button onclick="openSubPage('tab-warga')" class="flex items-center p-5 rounded-3xl border border-slate-200/80 bg-white hover:border-blue-500 hover:shadow-lg transition group text-left">
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mr-4 group-hover:bg-indigo-600 group-hover:text-white transition shrink-0">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base">Data Anggota & Warga</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Daftar kepala keluarga dan nomor rumah.</p>
+                        </div>
+                    </button>
+
+                    <button onclick="openSubPage('tab-pengaturan')" class="flex items-center p-5 rounded-3xl border border-slate-200/80 bg-white hover:border-blue-500 hover:shadow-lg transition group text-left">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center mr-4 group-hover:bg-slate-700 group-hover:text-white transition shrink-0">
+                            <i data-lucide="settings" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base">Pengaturan</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Konfigurasi wilayah, PIN petugas, & backup.</p>
+                        </div>
+                    </button>
+                </div>
+            </nav>
+        </div>
+
+        <!-- ================= SUB-HALAMAN ================= -->
+        <div id="subPageView" class="hidden flex-1 flex flex-col fade-in space-y-6">
+            
+            <header class="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
+                    <div>
+                        <span id="subPageBadge" class="bg-white/20 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider border border-white/20">Menu Utama</span>
+                        <h2 id="subPageTitle" class="text-xl sm:text-2xl font-black mt-2 tracking-tight">Judul Halaman</h2>
+                        <p id="subPageDesc" class="text-blue-100 text-xs font-medium mt-0.5">RT 02 BERSINAR PANJEN LOR • Desa Patuguran</p>
+                    </div>
+                    <div>
+                        <button onclick="backToDashboard()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white rounded-2xl text-xs font-bold backdrop-blur-md border border-white/20 transition shadow-sm">
+                            <i data-lucide="arrow-left" class="w-4 h-4"></i> Kembali ke Menu Utama
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 1. TAB PEMASUKAN & PENGELUARAN -->
+            <div id="tab-transaksi" class="sub-section hidden space-y-6 flex-1">
+                <div class="bg-white rounded-3xl shadow-sm p-5 border border-slate-200/80 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <label class="font-semibold text-xs text-slate-500 uppercase tracking-wider">Pilih Bulan:</label>
+                        <input type="month" id="filterBulan" onchange="renderAll()" class="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50">
+                    </div>
+                    <div class="w-full sm:w-72">
+                        <input type="text" id="searchWargaJimpitan" oninput="renderJimpitan()" placeholder="🔍 Cari nama warga..." class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-x-auto p-2">
+                    <div class="p-4 border-b border-slate-100">
+                        <h3 class="text-base font-black text-slate-900">Pemasukan Jimpitan Harian</h3>
+                        <p class="text-xs text-slate-400">Warga dapat mengecek siapa saja yang sudah/belum mengisi jimpitan.</p>
+                    </div>
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
-                                <th class="p-4">Nama Warga</th>
+                                <th class="p-4 sticky left-0 bg-slate-50 z-10">Warga</th>
                                 <th class="p-4">No Rumah</th>
-                                <th class="p-4 text-center">Keamanan (Rp)</th>
-                                <th class="p-4 text-center">Kebersihan (Rp)</th>
-                                <th class="p-4 text-center font-bold">Total Iuran</th>
                             </tr>
                         </thead>
-                        <tbody id="iuranTableBody"></tbody>
+                        <tbody id="jimpitanTableBody"></tbody>
+                        <tfoot id="jimpitanTableFoot"></tfoot>
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- ================= 3. TAB KAS & KEUANGAN ================= -->
-        <div id="tab-kas" class="tab-content hidden space-y-6">
-            
-            <!-- AREA YANG AKAN DI-CAPTURE -->
-            <div id="captureArea" class="space-y-6 bg-slate-50 p-2 rounded-3xl">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
-                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sisa Kas Bulan Lalu</p>
-                        <h3 id="saldoLaluDisplay" class="text-2xl font-black text-slate-900 mt-2">Rp 0</h3>
-                    </div>
-                    <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm border-l-4 border-l-emerald-500">
-                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pemasukan Bulan Ini</p>
-                        <h3 id="totalJimpitanDisplay" class="text-2xl font-black text-emerald-600 mt-2">Rp 0</h3>
-                    </div>
+            <!-- 2. TAB KAS & KEUANGAN -->
+            <div id="tab-kas" class="sub-section hidden space-y-6 flex-1">
+                
+                <!-- AREA CAPTURE (DITAMBAHKAN KELAS PRINT-BG-BLUE AGAR WARNA TETAP MUNCUL SAAT CETAK) -->
+                <div id="captureArea" class="space-y-6 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm max-w-4xl mx-auto">
                     
-                    <!-- Kotak Jimpitan Tanggal Tertentu -->
-                    <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Jimpitan Tgl:</p>
-                                <input type="date" id="pilihTanggalCek" onchange="renderKas()" class="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-slate-50 outline-none focus:ring-1 focus:ring-emerald-500 font-medium">
+                    <div class="print-bg-blue bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 text-white rounded-2xl p-5 shadow-md text-center">
+                        <h2 class="text-lg sm:text-xl font-black tracking-tight">RT 02 BERSINAR PANJEN LOR</h2>
+                        <p class="text-blue-100 text-xs font-medium mt-0.5">Desa Patuguran • Laporan Resmi Arus Kas & Keuangan Warga</p>
+                    </div>
+
+                    <!-- GRID DESKTOP (3 KOLOM) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sisa Kas Bulan Lalu</p>
+                            <h3 id="saldoLaluDisplay" class="text-lg font-black text-slate-900 mt-1">Rp 0</h3>
+                        </div>
+                        <div class="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-200 shadow-sm border-l-4 border-l-emerald-500">
+                            <p class="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Pemasukan Bulan Ini</p>
+                            <h3 id="totalJimpitanDisplay" class="text-lg font-black text-emerald-700 mt-1">Rp 0</h3>
+                        </div>
+                        <div class="bg-rose-50/80 p-4 rounded-2xl border border-rose-200 shadow-sm">
+                            <p class="text-xs font-semibold text-rose-700 uppercase tracking-wider">Pengeluaran Bulan Ini</p>
+                            <h3 id="totalKeluarDisplay" class="text-lg font-black text-rose-700 mt-1">Rp 0</h3>
+                        </div>
+                        <div class="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-200 shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-center mb-0.5">
+                                    <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Jimpitan Tgl:</p>
+                                    <input type="date" id="pilihTanggalCek" onchange="renderKas()" class="date-input-elem text-[11px] border border-emerald-300 rounded-lg px-2 py-0.5 bg-white outline-none font-medium text-emerald-800">
+                                    <span id="dateTextSpan" class="hidden text-[11px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200"></span>
+                                </div>
+                                <h3 id="totalJimpitanHariIniDisplay" class="text-lg font-black text-emerald-700 mt-1">Rp 0</h3>
                             </div>
-                            <h3 id="totalJimpitanHariIniDisplay" class="text-2xl font-black text-emerald-600 mt-1">Rp 0</h3>
+                        </div>
+                        <!-- KARTU AKUMULASI SALDO GLOBAL DENGAN KELAS PRINT-BG-BLUE -->
+                        <div class="print-bg-blue bg-gradient-to-tr from-blue-600 to-indigo-600 text-white p-4 rounded-2xl shadow-md sm:col-span-2">
+                            <p class="text-xs font-semibold text-blue-100 uppercase tracking-wider">Akumulasi Saldo Global</p>
+                            <h3 id="saldoAkhirDisplay" class="text-lg font-black mt-1">Rp 0</h3>
                         </div>
                     </div>
 
-                    <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
-                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pengeluaran Bulan Ini</p>
-                        <h3 id="totalKeluarDisplay" class="text-2xl font-black text-rose-600 mt-2">Rp 0</h3>
-                    </div>
-                    <div class="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white p-6 rounded-3xl shadow-lg shadow-blue-600/20 sm:col-span-2 lg:col-span-1">
-                        <p class="text-xs font-semibold text-blue-100 uppercase tracking-wider">Akumulasi Saldo Global</p>
-                        <h3 id="saldoAkhirDisplay" class="text-2xl font-black mt-2">Rp 0</h3>
+                    <div class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden pt-2">
+                        <h3 class="text-base font-black text-slate-900 tracking-tight mb-3">Riwayat Arus Kas RT</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold text-xs">
+                                        <th class="p-3">No. Bukti / Kode</th>
+                                        <th class="p-3">Tanggal</th>
+                                        <th class="p-3">Uraian / Keterangan</th>
+                                        <th class="p-3 text-right">Masuk (Rp)</th>
+                                        <th class="p-3 text-right">Keluar (Rp)</th>
+                                        <th class="p-3 text-center action-col hidden">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="kasTableBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
+                <!-- AKHIR AREA CAPTURE -->
 
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden p-6 sm:p-8">
-                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4">Riwayat Arus Kas RT</h3>
+                <div class="flex flex-wrap justify-end gap-2.5 pt-2">
+                    <button onclick="captureAndShare()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition flex items-center gap-2 shadow-sm">
+                        <i data-lucide="camera" class="w-4 h-4"></i> Kirim Gambar (WA)
+                    </button>
+                    <button onclick="shareToWhatsApp()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition flex items-center gap-2 shadow-sm">
+                        <i data-lucide="message-circle" class="w-4 h-4"></i> Salin Laporan WA
+                    </button>
+                    <button onclick="exportToCSV()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition flex items-center gap-2 shadow-sm">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Download Excel
+                    </button>
+                    <button onclick="window.print()" class="bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition flex items-center gap-2 shadow-sm">
+                        <i data-lucide="printer" class="w-4 h-4"></i> Cetak / PDF
+                    </button>
+                </div>
+
+                <div id="formKeuanganContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
+                    <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/80">
+                        <h3 class="text-base font-bold mb-4 flex items-center gap-2 text-emerald-700">
+                            <i data-lucide="plus-circle" class="w-5 h-5"></i> Catat Pemasukan Lain / Donasi
+                        </h3>
+                        <form onsubmit="tambahPemasukanLain(event)" class="space-y-3.5">
+                            <input type="date" id="tglMasuk" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                            <input type="text" id="ketMasuk" placeholder="Keterangan (Contoh: Donasi Warga Luar)" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                            <input type="number" id="nomMasuk" placeholder="Nominal (Rp)" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition text-sm">Simpan Pemasukan</button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/80">
+                        <h3 class="text-base font-bold mb-4 flex items-center gap-2 text-rose-700">
+                            <i data-lucide="minus-circle" class="w-5 h-5"></i> Catat Pengeluaran Kas
+                        </h3>
+                        <form onsubmit="tambahPengeluaran(event)" class="space-y-3.5">
+                            <input type="date" id="tglKeluar" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                            <select id="kategoriKeluar" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                                <option value="Sosial / Warga Sakit">🏥 Sosial / Warga Sakit</option>
+                                <option value="Perayaan / Agustusan">🎉 Perayaan / Agustusan</option>
+                                <option value="Kebersihan / Perbaikan">🧹 Kebersihan / Perbaikan</option>
+                                <option value="Lain-lain">📦 Lain-lain</option>
+                            </select>
+                            <input type="text" id="ketKeluar" placeholder="Keterangan Rinci" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                            <input type="number" id="nomKeluar" placeholder="Nominal (Rp)" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                            <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3 rounded-xl transition text-sm">Simpan Pengeluaran</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. TAB DATA WARGA -->
+            <div id="tab-warga" class="sub-section hidden space-y-6 flex-1">
+                <div id="formWargaCard" class="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/80 hidden">
+                    <h3 class="text-lg font-black text-slate-900 tracking-tight mb-4">Tambah Kepala Keluarga Baru</h3>
+                    <form onsubmit="tambahWarga(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <input type="text" id="namaWarga" placeholder="Nama Kepala Keluarga" required class="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                        <input type="text" id="noRumah" placeholder="Nomor Rumah (Contoh: No. 12)" required class="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition text-sm">Tambah Warga</button>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+                        <h3 id="wargaListTitle" class="text-xl font-black text-slate-900 tracking-tight">Daftar Warga</h3>
+                        <input type="text" id="searchWargaTab" oninput="renderWarga()" placeholder="🔍 Cari warga..." class="w-full sm:w-64 border border-slate-200 rounded-xl px-4 py-2 text-sm bg-slate-50 outline-none">
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm border-collapse">
                             <thead>
                                 <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
-                                    <th class="p-4">Tanggal</th>
-                                    <th class="p-4">Uraian / Keterangan</th>
-                                    <th class="p-4 text-right">Masuk (Rp)</th>
-                                    <th class="p-4 text-right">Keluar (Rp)</th>
+                                    <th class="p-4">No</th>
+                                    <th class="p-4">Nama Kepala Keluarga</th>
+                                    <th class="p-4">Nomor Rumah</th>
                                     <th class="p-4 text-center action-col hidden">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody id="kasTableBody"></tbody>
+                            <tbody id="wargaTableBody"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
-            <!-- AKHIR AREA CAPTURE -->
 
-            <!-- Tombol Aksi Kas & Keuangan (Hanya di Tab Kas) -->
-            <div class="flex flex-wrap justify-end gap-2.5 pt-2">
-                <button onclick="captureAndShare()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition flex items-center gap-2 shadow-sm">
-                    <i data-lucide="camera" class="w-4 h-4"></i> Kirim Gambar (WA)
-                </button>
-                <button onclick="shareToWhatsApp()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition flex items-center gap-2 shadow-sm">
-                    <i data-lucide="message-circle" class="w-4 h-4"></i> Salin Laporan WA
-                </button>
-                <button onclick="exportToCSV()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition flex items-center gap-2 shadow-sm">
-                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Download Excel (CSV)
-                </button>
-                <button onclick="window.print()" class="bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition flex items-center gap-2 shadow-sm">
-                    <i data-lucide="printer" class="w-4 h-4"></i> Cetak / PDF
-                </button>
-            </div>
-
-            <div id="formKeuanganContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
-                <div class="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/80">
-                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2 text-emerald-700">
-                        <i data-lucide="plus-circle" class="w-5 h-5 text-emerald-600"></i> Catat Pemasukan Lain
+            <!-- 4. TAB PENGATURAN -->
+            <div id="tab-pengaturan" class="sub-section hidden space-y-6 flex-1">
+                <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/80 max-w-2xl mx-auto">
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 flex items-center gap-2">
+                        <i data-lucide="settings" class="w-5 h-5 text-blue-600"></i> Pengaturan Wilayah & Saldo Awal
                     </h3>
-                    <form onsubmit="tambahPemasukanLain(event)" class="space-y-3.5">
-                        <input type="date" id="tglMasuk" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
-                        <input type="text" id="ketMasuk" placeholder="Keterangan (Contoh: Donasi Warga)" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
-                        <input type="number" id="nomMasuk" placeholder="Nominal (Rp)" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition shadow-sm">Simpan Pemasukan</button>
+                    <form onsubmit="simpanPengaturanUmum(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama RT / Wilayah</label>
+                            <input type="text" id="setRtName" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Desa / Kelurahan</label>
+                            <input type="text" id="setDesaName" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Saldo Awal Kas (Rp)</label>
+                            <input type="number" id="setSaldoAwal" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none">
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition text-sm">Simpan Perubahan</button>
                     </form>
                 </div>
 
-                <div class="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/80">
-                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2 text-rose-700">
-                        <i data-lucide="minus-circle" class="w-5 h-5 text-rose-600"></i> Catat Pengeluaran Kas
+                <div id="adminLogSection" class="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/80 max-w-2xl mx-auto hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                            <i data-lucide="shield-alert" class="w-5 h-5 text-amber-600"></i> Riwayat Aktivitas Petugas & Admin
+                        </h3>
+                        <button onclick="clearLogs()" class="text-rose-600 hover:text-rose-800 text-xs font-semibold bg-rose-50 px-3 py-1 rounded-lg border border-rose-100">Bersihkan</button>
+                    </div>
+                    <div id="activityLogsContainer"></div>
+                </div>
+
+                <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/80 max-w-2xl mx-auto">
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 flex items-center gap-2">
+                        <i data-lucide="user-plus" class="w-5 h-5 text-emerald-600"></i> Kelola Petugas & PIN
                     </h3>
-                    <form onsubmit="tambahPengeluaran(event)" class="space-y-3.5">
-                        <input type="date" id="tglKeluar" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500">
-                        <select id="kategoriKeluar" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500">
-                            <option value="Sosial / Warga Sakit">🏥 Sosial / Warga Sakit</option>
-                            <option value="Perayaan / Agustusan">🎉 Perayaan / Agustusan</option>
-                            <option value="Kebersihan / Perbaikan">🧹 Kebersihan / Perbaikan</option>
-                            <option value="Lain-lain">📦 Lain-lain</option>
-                        </select>
-                        <input type="text" id="ketKeluar" placeholder="Keterangan Rinci" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500">
-                        <input type="number" id="nomKeluar" placeholder="Nominal (Rp)" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500">
-                        <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3 rounded-xl transition shadow-sm">Simpan Pengeluaran</button>
-                    </form>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- ================= 4. TAB DATA WARGA ================= -->
-        <div id="tab-warga" class="tab-content hidden space-y-6">
-            <div id="formWargaCard" class="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/80 hidden">
-                <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4">Tambah Kepala Keluarga Baru</h3>
-                <form onsubmit="tambahWarga(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <input type="text" id="namaWarga" placeholder="Nama Kepala Keluarga" required class="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
-                    <input type="text" id="noRumah" placeholder="Nomor Rumah (Contoh: No. 12)" required class="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition shadow-sm">Tambah Warga</button>
-                </form>
-            </div>
-
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden p-6 sm:p-8">
-                <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
-                    <h3 id="wargaListTitle" class="text-xl font-black text-slate-900 tracking-tight">Daftar Warga</h3>
-                    <input type="text" id="searchWargaTab" oninput="renderWarga()" placeholder="🔍 Cari warga..." class="w-full sm:w-64 border border-slate-200 rounded-xl px-4 py-2 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm border-collapse">
-                        <thead>
-                            <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
-                                <th class="p-4">No</th>
-                                <th class="p-4">Nama Kepala Keluarga</th>
-                                <th class="p-4">Nomor Rumah</th>
-                                <th class="p-4 text-center action-col hidden">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="wargaTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ================= 5. TAB PENGATURAN ================= -->
-        <div id="tab-pengaturan" class="tab-content hidden space-y-6">
-            <div class="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/80 max-w-2xl mx-auto mb-6">
-                <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 flex items-center gap-2">
-                    <i data-lucide="settings" class="w-5 h-5 text-blue-600"></i> Pengaturan Wilayah & Saldo Awal
-                </h3>
-                <form onsubmit="simpanPengaturanUmum(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama RT / Wilayah</label>
-                        <input type="text" id="setRtName" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
+                    <div id="addPetugasBox" class="hidden mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <p class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Tambah Akun Petugas Baru</p>
+                        <form onsubmit="tambahPetugasBaru(event)" class="space-y-3">
+                            <input type="text" id="baruNamaPetugas" placeholder="Nama Petugas" required class="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-sm bg-white outline-none">
+                            <input type="password" id="baruPinPetugas" placeholder="PIN Rahasia" required class="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-sm bg-white outline-none">
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition text-sm">Tambah Petugas</button>
+                        </form>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nama Desa / Kelurahan</label>
-                        <input type="text" id="setDesaName" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
+                                    <th class="p-4">Nama Petugas</th>
+                                    <th class="p-4">PIN Rahasia</th>
+                                    <th class="p-4 text-center admin-only hidden">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="petugasTableBody"></tbody>
+                        </table>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Saldo Awal Kas (Rp)</label>
-                        <input type="number" id="setSaldoAwal" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-md shadow-blue-600/20">Simpan Perubahan</button>
-                </form>
-            </div>
+                </div>
 
-            <!-- RIWAYAT AKTIVITAS -->
-            <div id="adminLogSection" class="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/80 max-w-2xl mx-auto mb-6 hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                        <i data-lucide="shield-alert" class="w-5 h-5 text-amber-600"></i> Riwayat Aktivitas Petugas & Admin
+                <div class="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/80 max-w-2xl mx-auto admin-only hidden space-y-4">
+                    <h3 class="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                        <i data-lucide="database" class="w-5 h-5 text-indigo-600"></i> Cadangkan & Pulihkan Data
                     </h3>
-                    <button onclick="clearLogs()" class="text-rose-600 hover:text-rose-800 text-xs font-semibold bg-rose-50 px-3 py-1 rounded-lg border border-rose-100">Bersihkan Riwayat</button>
-                </div>
-                <p class="text-xs text-slate-400 font-medium mb-4">Catatan masuk aplikasi, edit data, dan input keuangan (Hanya dapat dilihat oleh Admin).</p>
-                <div id="activityLogsContainer"></div>
-            </div>
-
-            <!-- Kelola & Tambah Petugas -->
-            <div class="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/80 max-w-2xl mx-auto mb-6">
-                <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 flex items-center gap-2">
-                    <i data-lucide="user-plus" class="w-5 h-5 text-emerald-600"></i> Kelola Petugas & Keamanan PIN
-                </h3>
-                
-                <div id="addPetugasBox" class="hidden mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <p class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Tambah Akun Petugas Baru</p>
-                    <form onsubmit="tambahPetugasBaru(event)" class="space-y-3">
-                        <input type="text" id="baruNamaPetugas" placeholder="Nama Petugas" required class="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500">
-                        <input type="password" id="baruPinPetugas" placeholder="PIN Rahasia (Angka)" required class="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500">
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition text-sm">Tambah Petugas</button>
-                    </form>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm border-collapse">
-                        <thead>
-                            <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
-                                <th class="p-4">Nama Pengguna / Petugas</th>
-                                <th class="p-4">PIN Rahasia</th>
-                                <th class="p-4 text-center admin-only hidden">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="petugasTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Cadangan & Pemulihan Data -->
-            <div class="bg-white rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200/80 max-w-2xl mx-auto mb-6 admin-only hidden">
-                <h3 class="text-xl font-black text-slate-900 tracking-tight mb-4 flex items-center gap-2">
-                    <i data-lucide="database" class="w-5 h-5 text-indigo-600"></i> Cadangkan & Pulihkan Data
-                </h3>
-                <div class="space-y-3.5">
-                    <button onclick="backupData()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-sm">
+                    <button onclick="backupData()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2">
                         <i data-lucide="download" class="w-4 h-4"></i> Download File Backup (.json)
                     </button>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tempel Teks Data JSON:</label>
-                        <textarea id="jsonTextInput" rows="3" placeholder="Tempel kode teks JSON backup di sini..." class="w-full border border-slate-200 rounded-xl p-3 text-xs outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"></textarea>
+                        <textarea id="jsonTextInput" rows="2" placeholder="Tempel kode JSON backup di sini..." class="w-full border border-slate-200 rounded-xl p-3 text-xs outline-none bg-slate-50"></textarea>
                     </div>
-                    <button onclick="restoreDataFromText()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-sm">
-                        <i data-lucide="upload" class="w-4 h-4"></i> Pulihkan Data dari Kotak Teks
+                    <button onclick="restoreDataFromText()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition text-sm">
+                        Pulihkan Data dari Kotak Teks
                     </button>
                 </div>
-            </div>
 
-            <!-- Reset Total -->
-            <div class="bg-rose-50/80 rounded-3xl shadow-sm p-6 sm:p-8 border border-rose-200 max-w-2xl mx-auto mb-6 admin-only hidden">
-                <h3 class="text-lg font-bold mb-2 text-rose-700 flex items-center gap-2">
-                    <i data-lucide="alert-triangle" class="w-5 h-5"></i> Reset Total Sistem
-                </h3>
-                <p class="text-xs text-rose-600 mb-4 font-medium">Menghapus seluruh data warga, jimpitan, iuran, dan kas akan dihapus bersih kembali ke nol.</p>
-                <button onclick="resetTotalData()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-sm">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Semua Data & Mulai Dari Nol
-                </button>
-            </div>
-
-            <!-- Logout -->
-            <div class="bg-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 border border-slate-200 max-w-2xl mx-auto text-center">
-                <h3 class="text-base font-bold mb-1 text-slate-800">Selesai Mengelola?</h3>
-                <p class="text-xs text-slate-500 mb-4 font-medium">Keluar atau Ganti Akun.</p>
-                <button onclick="logout()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3.5 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-md">
-                    <i data-lucide="log-out" class="w-4 h-4"></i> Ganti Akun / Keluar
-                </button>
+                <div class="bg-slate-100 rounded-3xl shadow-sm p-6 border border-slate-200 max-w-2xl mx-auto text-center">
+                    <button onclick="logout()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3.5 rounded-xl transition text-sm flex items-center justify-center gap-2">
+                        <i data-lucide="log-out" class="w-4 h-4"></i> Ganti Akun / Keluar
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -500,7 +514,6 @@
         };
 
         let adminPin = '9999';
-
         let petugasList = [
             { id: 1, nama: 'Bpk. Ketua RT', pin: '1234' },
             { id: 2, nama: 'Bpk. Bendahara', pin: '5678' }
@@ -508,16 +521,9 @@
 
         let wargaList = [];
         let jimpitanData = {};
-        let iuranData = {};
         let kasMasukLain = [];
         let kasKeluar = [];
         let activityLogs = [];
-
-        const defaultForceDate = '2026-10-08';
-        document.getElementById('filterBulan').value = defaultForceDate.slice(0, 7);
-        document.getElementById('pilihTanggalCek').value = defaultForceDate;
-        document.getElementById('tglMasuk').value = defaultForceDate;
-        document.getElementById('tglKeluar').value = defaultForceDate;
 
         function logActivity(keterangan) {
             const waktu = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
@@ -532,17 +538,14 @@
             const container = document.getElementById('activityLogsContainer');
             if (!container) return;
             if (activityLogs.length === 0) {
-                container.innerHTML = `<p class="text-xs text-slate-400 italic text-center py-4">Belum ada riwayat aktivitas tercatat.</p>`;
+                container.innerHTML = `<p class="text-xs text-slate-400 italic text-center py-2">Belum ada riwayat aktivitas.</p>`;
                 return;
             }
-            let html = `<div class="space-y-2 max-h-60 overflow-y-auto pr-2">`;
+            let html = `<div class="space-y-2 max-h-48 overflow-y-auto pr-1">`;
             activityLogs.forEach(log => {
                 html += `
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
-                        <div>
-                            <span class="font-bold text-slate-800">[${log.user}]</span> 
-                            <span class="text-slate-600">${log.ket}</span>
-                        </div>
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-xs flex justify-between items-center gap-1">
+                        <div><span class="font-bold text-slate-800">[${log.user}]</span> <span class="text-slate-600">${log.ket}</span></div>
                         <span class="text-[10px] text-slate-400 font-medium">${log.waktu}</span>
                     </div>
                 `;
@@ -553,7 +556,7 @@
 
         function clearLogs() {
             if (currentRole !== 'admin') return;
-            if (confirm('Hapus semua riwayat aktivitas?')) {
+            if (confirm('Hapus riwayat aktivitas?')) {
                 activityLogs = [];
                 window.saveToCloud('rt02_logs', activityLogs);
                 renderLogs();
@@ -578,26 +581,22 @@
                 if (pinInput === adminPin) {
                     currentRole = 'admin';
                     activeUser = 'Administrator';
-                    logActivity('Masuk ke sistem sebagai Administrator Utama');
+                    logActivity('Masuk sebagai Administrator Utama');
                     updateRoleUI();
                     document.getElementById('loginModal').classList.add('hidden');
                     document.getElementById('globalPinInput').value = '';
-                } else {
-                    alert('PIN Admin Salah! (Default: 9999)');
-                }
+                } else { alert('PIN Admin Salah! (Default: 9999)'); }
             } else {
                 const petugasId = Number(selectedVal);
                 const petugas = petugasList.find(p => p.id === petugasId);
                 if (petugas && petugas.pin === pinInput) {
                     currentRole = 'petugas';
                     activeUser = petugas.nama;
-                    logActivity(`Masuk ke sistem sebagai Petugas (${petugas.nama})`);
+                    logActivity(`Masuk sebagai Petugas (${petugas.nama})`);
                     updateRoleUI();
                     document.getElementById('loginModal').classList.add('hidden');
                     document.getElementById('globalPinInput').value = '';
-                } else {
-                    alert('PIN Petugas Salah!');
-                }
+                } else { alert('PIN Petugas Salah!'); }
             }
         }
 
@@ -609,13 +608,13 @@
         }
 
         function logout() {
-            logActivity(`Keluar dari sesi pengurus`);
+            logActivity(`Keluar dari sesi`);
             currentRole = 'warga';
             activeUser = '';
             initLoginDropdown();
             document.getElementById('globalPinInput').value = '';
             document.getElementById('loginModal').classList.remove('hidden');
-            switchTab('jimpitan');
+            backToDashboard();
         }
 
         function updateRoleUI() {
@@ -630,8 +629,7 @@
             const adminLogSection = document.getElementById('adminLogSection');
 
             if (currentRole === 'admin') {
-                badge.innerText = 'Mode Admin (Full Akses)';
-                badge.className = 'bg-white/20 backdrop-blur-md text-white text-xs px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider border border-white/20';
+                badge.innerText = 'Mode Admin';
                 actionCols.forEach(el => el.classList.remove('hidden'));
                 staffOnlyElements.forEach(el => el.classList.remove('hidden'));
                 if(formWarga) formWarga.classList.remove('hidden');
@@ -642,8 +640,7 @@
                 userLabel.innerText = `User: ${activeUser}`;
                 userLabel.classList.remove('hidden');
             } else if (currentRole === 'petugas') {
-                badge.innerText = 'Mode Petugas RT';
-                badge.className = 'bg-white/20 backdrop-blur-md text-white text-xs px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider border border-white/20';
+                badge.innerText = 'Mode Petugas';
                 actionCols.forEach(el => el.classList.remove('hidden'));
                 staffOnlyElements.forEach(el => el.classList.remove('hidden'));
                 if(formWarga) formWarga.classList.remove('hidden');
@@ -654,8 +651,7 @@
                 userLabel.innerText = `User: ${activeUser}`;
                 userLabel.classList.remove('hidden');
             } else {
-                badge.innerText = 'Mode Warga (Hanya Lihat)';
-                badge.className = 'bg-white/20 backdrop-blur-md text-white text-xs px-3.5 py-1.5 rounded-full font-semibold uppercase tracking-wider border border-white/20';
+                badge.innerText = 'Mode Warga';
                 actionCols.forEach(el => el.classList.add('hidden'));
                 staffOnlyElements.forEach(el => el.classList.add('hidden'));
                 if(formWarga) formWarga.classList.add('hidden');
@@ -663,7 +659,6 @@
                 if(adminLogSection) adminLogSection.classList.add('hidden');
                 adminOnlyCols.forEach(el => el.classList.add('hidden'));
                 userLabel.classList.add('hidden');
-                switchTab('jimpitan');
             }
             applyConfigToUI();
             renderAll();
@@ -676,34 +671,87 @@
             document.getElementById('headerRtName').innerText = configRT.rtName;
             document.getElementById('headerDesaName').innerText = `${configRT.desaName} • Jimpitan & Kas Warga Transparan`;
             document.getElementById('wargaListTitle').innerText = `Daftar Warga ${configRT.rtName}`;
-
             document.getElementById('setRtName').value = configRT.rtName;
             document.getElementById('setDesaName').value = configRT.desaName;
             document.getElementById('setSaldoAwal').value = configRT.saldoAwal;
         }
 
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(el => {
-                el.className = 'tab-btn px-5 py-3 rounded-2xl font-semibold text-sm bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80 transition flex items-center gap-2 whitespace-nowrap';
-            });
+        function openSubPage(sectionId) {
+            document.getElementById('mainDashboardView').classList.add('hidden');
+            document.getElementById('subPageView').classList.remove('hidden');
+            document.querySelectorAll('.sub-section').forEach(sec => sec.classList.add('hidden'));
+            document.getElementById(sectionId).classList.remove('hidden');
 
-            document.getElementById('tab-' + tabName).classList.remove('hidden');
-            const activeBtn = document.getElementById('tabBtn-' + tabName);
-            activeBtn.className = 'tab-btn px-5 py-3 rounded-2xl font-semibold text-sm bg-blue-600 text-white shadow-md shadow-blue-600/20 transition flex items-center gap-2 whitespace-nowrap';
-            
-            if (tabName === 'kas') {
-                document.getElementById('pilihTanggalCek').value = '2026-10-08';
+            const titles = {
+                'tab-transaksi': { title: 'Pemasukan Jimpitan Harian', badge: 'Menu Pemasukan' },
+                'tab-kas': { title: 'Kas, Saldo & Keuangan', badge: 'Menu Keuangan' },
+                'tab-warga': { title: 'Data Anggota & Warga', badge: 'Menu Warga' },
+                'tab-pengaturan': { title: 'Pengaturan Sistem', badge: 'Menu Pengaturan' }
+            };
+            if(titles[sectionId]) {
+                document.getElementById('subPageTitle').innerText = titles[sectionId].title;
+                document.getElementById('subPageBadge').innerText = titles[sectionId].badge;
+                document.getElementById('subPageDesc').innerText = `${configRT.rtName} • ${configRT.desaName}`;
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (sectionId === 'tab-kas') {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('pilihTanggalCek').value = today;
                 renderKas();
             }
+        }
+
+        function backToDashboard() {
+            document.getElementById('subPageView').classList.add('hidden');
+            document.getElementById('mainDashboardView').classList.remove('hidden');
+            updateDashboardSummary();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function updateDashboardSummary() {
+            const bulanVal = document.getElementById('filterBulan').value;
+            let totalMasukSebelumBulanIni = 0;
+            let totalKeluarSebelumBulanIni = 0;
+
+            Object.keys(jimpitanData).forEach(key => {
+                if (key.split('_')[0] < bulanVal && jimpitanData[key]) totalMasukSebelumBulanIni += Number(jimpitanData[key]);
+            });
+            kasMasukLain.forEach(item => {
+                if (item.tanggal && item.tanggal.slice(0, 7) < bulanVal) totalMasukSebelumBulanIni += Number(item.masuk || 0);
+            });
+            kasKeluar.forEach(item => {
+                if (item.tanggal && item.tanggal.slice(0, 7) < bulanVal) totalKeluarSebelumBulanIni += Number(item.keluar || 0);
+            });
+
+            let saldoSisaBulanLalu = Number(configRT.saldoAwal) + totalMasukSebelumBulanIni - totalKeluarSebelumBulanIni;
+            let totalJimpitanBulanIni = 0;
+            Object.keys(jimpitanData).forEach(key => {
+                if (key.startsWith(bulanVal) && jimpitanData[key]) totalJimpitanBulanIni += Number(jimpitanData[key]);
+            });
+            let totalMasukLainBulanIni = 0;
+            kasMasukLain.forEach(item => {
+                if (item.tanggal && item.tanggal.startsWith(bulanVal)) totalMasukLainBulanIni += Number(item.masuk || 0);
+            });
+
+            let totalPemasukanBulanIni = totalJimpitanBulanIni + totalMasukLainBulanIni;
+            let totalKeluarBulanIni = 0;
+            kasKeluar.forEach(item => {
+                if (item.tanggal && item.tanggal.startsWith(bulanVal)) totalKeluarBulanIni += Number(item.keluar || 0);
+            });
+            let akumulasiSaldoGlobal = saldoSisaBulanLalu + totalPemasukanBulanIni - totalKeluarBulanIni;
+
+            document.getElementById('dashSaldoAkhir').innerText = `Rp ${akumulasiSaldoGlobal.toLocaleString()}`;
+            document.getElementById('dashPemasukan').innerText = `Rp ${totalPemasukanBulanIni.toLocaleString()}`;
+            document.getElementById('dashPengeluaran').innerText = `Rp ${totalKeluarBulanIni.toLocaleString()}`;
         }
 
         function renderAll() {
             renderWarga();
             renderJimpitan();
-            renderIuran();
             renderKas();
             renderPetugas();
+            updateDashboardSummary();
             lucide.createIcons();
         }
 
@@ -711,7 +759,6 @@
             const keyword = document.getElementById('searchWargaTab').value.toLowerCase();
             const tbody = document.getElementById('wargaTableBody');
             tbody.innerHTML = '';
-            
             const filtered = wargaList.filter(w => w.nama.toLowerCase().includes(keyword) || w.rumah.toLowerCase().includes(keyword));
 
             if(filtered.length === 0) {
@@ -727,8 +774,8 @@
                         <td class="p-4 text-slate-500 font-medium">${w.rumah}</td>
                         <td class="p-4 text-center action-col ${currentRole === 'warga' ? 'hidden' : ''}">
                             <div class="flex items-center justify-center gap-2">
-                                <button onclick="editWarga(${w.id})" class="text-blue-600 hover:text-blue-800 text-xs font-semibold bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100">Edit</button>
-                                <button onclick="hapusWarga(${w.id})" class="text-rose-600 hover:text-rose-800 text-xs font-semibold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100">Hapus</button>
+                                <button onclick="editWarga(${w.id})" class="text-blue-600 text-xs font-semibold bg-blue-50 px-3 py-1.5 rounded-xl">Edit</button>
+                                <button onclick="hapusWarga(${w.id})" class="text-rose-600 text-xs font-semibold bg-rose-50 px-3 py-1.5 rounded-xl">Hapus</button>
                             </div>
                         </td>
                     </tr>
@@ -743,7 +790,7 @@
             const rumah = document.getElementById('noRumah').value;
             wargaList.push({ id: Date.now(), nama, rumah });
             window.saveToCloud('rt02_warga', wargaList);
-            logActivity(`Menambah warga baru: ${nama} (${rumah})`);
+            logActivity(`Menambah warga: ${nama} (${rumah})`);
             document.getElementById('namaWarga').value = '';
             document.getElementById('noRumah').value = '';
             renderAll();
@@ -753,96 +800,26 @@
             if (currentRole === 'warga') return;
             const w = wargaList.find(item => item.id === id);
             if (!w) return;
-
             const namaBaru = prompt("Edit Nama Kepala Keluarga:", w.nama);
             if (namaBaru === null) return;
-
             const rumahBaru = prompt("Edit Nomor Rumah:", w.rumah);
             if (rumahBaru === null) return;
 
-            if (namaBaru.trim() === "" || rumahBaru.trim() === "") {
-                alert("Nama dan nomor rumah tidak boleh kosong!");
-                return;
-            }
-
-            const namaLama = w.nama;
             w.nama = namaBaru.trim();
             w.rumah = rumahBaru.trim();
-
             window.saveToCloud('rt02_warga', wargaList);
-            logActivity(`Mengubah data warga dari (${namaLama}) menjadi (${w.nama} - ${w.rumah})`);
+            logActivity(`Mengubah data warga: ${w.nama}`);
             renderAll();
-            alert("Data warga berhasil diperbarui!");
         }
 
         function hapusWarga(id) {
             if (currentRole === 'warga') return;
-            const w = wargaList.find(item => item.id === id);
             if (confirm('Yakin ingin menghapus warga ini?')) {
                 wargaList = wargaList.filter(w => w.id !== id);
                 window.saveToCloud('rt02_warga', wargaList);
-                logActivity(`Menghapus data warga: ${w ? w.nama : id}`);
+                logActivity(`Menghapus warga`);
                 renderAll();
             }
-        }
-
-        function renderIuran() {
-            const bulanVal = document.getElementById('filterBulan').value;
-            const tbody = document.getElementById('iuranTableBody');
-            tbody.innerHTML = '';
-
-            if(wargaList.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 italic">Belum ada data warga.</td></tr>`;
-                return;
-            }
-
-            wargaList.forEach(w => {
-                const keyKeamanan = `${bulanVal}_${w.id}_keamanan`;
-                const keyKebersihan = `${bulanVal}_${w.id}_kebersihan`;
-                const valKeamanan = iuranData[keyKeamanan] || '';
-                const valKebersihan = iuranData[keyKebersihan] || '';
-                const totalWargaIuran = (Number(valKeamanan) || 0) + (Number(valKebersihan) || 0);
-
-                if (currentRole === 'admin' || currentRole === 'petugas') {
-                    tbody.innerHTML += `
-                        <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition">
-                            <td class="p-4 font-bold text-slate-900">${w.nama}</td>
-                            <td class="p-4 text-slate-500 font-medium">${w.rumah}</td>
-                            <td class="p-3 text-center">
-                                <input type="number" value="${valKeamanan}" placeholder="0" onchange="updateIuranNominal('${keyKeamanan}', this.value, '${w.nama}', 'Keamanan')" class="w-28 text-center text-xs font-medium border border-slate-200 rounded-xl py-2 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
-                            </td>
-                            <td class="p-3 text-center">
-                                <input type="number" value="${valKebersihan}" placeholder="0" onchange="updateIuranNominal('${keyKebersihan}', this.value, '${w.nama}', 'Kebersihan')" class="w-28 text-center text-xs font-medium border border-slate-200 rounded-xl py-2 bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
-                            </td>
-                            <td class="p-4 text-center font-black text-emerald-600">Rp ${totalWargaIuran.toLocaleString()}</td>
-                        </tr>
-                    `;
-                } else {
-                    tbody.innerHTML += `
-                        <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition">
-                            <td class="p-4 font-bold text-slate-900">${w.nama}</td>
-                            <td class="p-4 text-slate-500 font-medium">${w.rumah}</td>
-                            <td class="p-4 text-center font-medium">${valKeamanan ? Number(valKeamanan).toLocaleString() : '-'}</td>
-                            <td class="p-4 text-center font-medium">${valKebersihan ? Number(valKebersihan).toLocaleString() : '-'}</td>
-                            <td class="p-4 text-center font-black text-emerald-600">Rp ${totalWargaIuran.toLocaleString()}</td>
-                        </tr>
-                    `;
-                }
-            });
-        }
-
-        function updateIuranNominal(key, val, namaWarga, jenis) {
-            if (currentRole === 'warga') return;
-            if (val === '' || Number(val) <= 0) {
-                delete iuranData[key];
-                logActivity(`Menghapus iuran ${jenis} warga ${namaWarga}`);
-            } else {
-                iuranData[key] = Number(val);
-                logActivity(`Mengisi iuran ${jenis} warga ${namaWarga}: Rp ${Number(val).toLocaleString()}`);
-            }
-            window.saveToCloud('rt02_iuran', iuranData);
-            renderIuran();
-            renderKas();
         }
 
         function renderPetugas() {
@@ -854,102 +831,41 @@
                 tbody.innerHTML += `
                     <tr class="border-b border-slate-100 bg-indigo-50/40">
                         <td class="p-4 font-bold text-indigo-700">Administrator Utama</td>
-                        <td class="p-3"><input type="text" value="${adminPin}" onchange="ubahAdminPin(this.value)" class="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold w-32 bg-white shadow-sm"></td>
-                        <td class="p-3 text-center text-xs text-slate-400 italic admin-only">Akun Utama</td>
+                        <td class="p-3"><input type="text" value="${adminPin}" onchange="ubahAdminPin(this.value)" class="border rounded-xl px-3 py-1.5 text-xs font-bold w-32 bg-white"></td>
+                        <td class="p-3 text-center text-xs text-slate-400 admin-only">Utama</td>
                     </tr>
                 `;
             }
 
             petugasList.forEach((p) => {
-                let namaDisplayHtml = '';
-                let pinDisplayHtml = '';
-                let actionHtml = '';
-
-                if (currentRole === 'admin') {
-                    namaDisplayHtml = `<input type="text" value="${p.nama}" onchange="ubahNamaPetugas(${p.id}, this.value)" class="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold w-44 bg-white shadow-sm">`;
-                    pinDisplayHtml = `<input type="text" value="${p.pin}" onchange="ubahPinPetugas(${p.id}, this.value)" class="border border-slate-200 rounded-xl px-3 py-1.5 text-xs w-28 bg-white shadow-sm font-medium">`;
-                    actionHtml = `<button onclick="hapusPetugas(${p.id})" class="text-rose-600 hover:text-rose-800 text-xs font-semibold bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100">Hapus</button>`;
-                } else if (currentRole === 'petugas' && p.nama === activeUser) {
-                    namaDisplayHtml = `<span class="font-bold text-slate-900">${p.nama}</span>`;
-                    pinDisplayHtml = `<input type="text" value="${p.pin}" onchange="ubahPinPetugas(${p.id}, this.value)" class="border border-slate-200 rounded-xl px-3 py-1.5 text-xs w-28 bg-white shadow-sm font-medium"> <span class="text-xs text-emerald-600 font-semibold">(PIN Anda)</span>`;
-                    actionHtml = `-`;
-                } else {
-                    namaDisplayHtml = `<span class="font-bold text-slate-900">${p.nama}</span>`;
-                    pinDisplayHtml = `<span class="text-slate-400 italic font-medium">•••• (Privasi)</span>`;
-                    actionHtml = `-`;
-                }
+                let namaHtml = currentRole === 'admin' ? `<input type="text" value="${p.nama}" onchange="ubahNamaPetugas(${p.id}, this.value)" class="border rounded-xl px-3 py-1.5 text-xs font-bold w-44 bg-white">` : `<span class="font-bold">${p.nama}</span>`;
+                let pinHtml = (currentRole === 'admin' || (currentRole === 'petugas' && p.nama === activeUser)) ? `<input type="text" value="${p.pin}" onchange="ubahPinPetugas(${p.id}, this.value)" class="border rounded-xl px-3 py-1.5 text-xs w-28 bg-white">` : `<span>••••</span>`;
+                let actHtml = currentRole === 'admin' ? `<button onclick="hapusPetugas(${p.id})" class="text-rose-600 bg-rose-50 px-2 py-1 rounded-lg text-xs">Hapus</button>` : `-`;
 
                 tbody.innerHTML += `
-                    <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition">
-                        <td class="p-4">${namaDisplayHtml}</td>
-                        <td class="p-3">${pinDisplayHtml}</td>
-                        <td class="p-3 text-center admin-only ${currentRole !== 'admin' ? 'hidden' : ''}">${actionHtml}</td>
+                    <tr class="border-b border-slate-100">
+                        <td class="p-4">${namaHtml}</td>
+                        <td class="p-3">${pinHtml}</td>
+                        <td class="p-3 text-center admin-only">${actHtml}</td>
                     </tr>
                 `;
             });
         }
 
-        function ubahAdminPin(newPin) {
-            if (currentRole !== 'admin') return;
-            adminPin = newPin;
-            window.saveToCloud('rt02_admin_pin', adminPin);
-            logActivity('Mengubah PIN Administrator Utama');
-            alert('PIN Administrator berhasil diperbarui!');
-        }
-
-        function ubahNamaPetugas(id, newNama) {
-            if (currentRole !== 'admin') return;
-            const p = petugasList.find(item => item.id === id);
-            if (p) {
-                const namaLama = p.nama;
-                p.nama = newNama.trim();
-                window.saveToCloud('rt02_petugas', petugasList);
-                initLoginDropdown();
-                logActivity(`Mengubah nama petugas dari (${namaLama}) menjadi (${p.nama})`);
-                alert('Nama petugas berhasil diperbarui!');
-            }
-        }
-
+        function ubahAdminPin(newPin) { if (currentRole === 'admin') { adminPin = newPin; window.saveToCloud('rt02_admin_pin', adminPin); alert('PIN Admin diperbarui!'); } }
+        function ubahNamaPetugas(id, newNama) { const p = petugasList.find(item => item.id === id); if(p) { p.nama = newNama; window.saveToCloud('rt02_petugas', petugasList); initLoginDropdown(); renderPetugas(); } }
         function tambahPetugasBaru(e) {
             e.preventDefault();
             if (currentRole !== 'admin') return;
-            const nama = document.getElementById('baruNamaPetugas').value;
-            const pin = document.getElementById('baruPinPetugas').value;
-            petugasList.push({ id: Date.now(), nama, pin });
+            petugasList.push({ id: Date.now(), nama: document.getElementById('baruNamaPetugas').value, pin: document.getElementById('baruPinPetugas').value });
             window.saveToCloud('rt02_petugas', petugasList);
-            logActivity(`Menambah akun petugas baru: ${nama}`);
             document.getElementById('baruNamaPetugas').value = '';
             document.getElementById('baruPinPetugas').value = '';
             initLoginDropdown();
             renderPetugas();
-            alert('Petugas baru berhasil ditambahkan!');
         }
-
-        function ubahPinPetugas(id, newPin) {
-            const p = petugasList.find(item => item.id === id);
-            if (p) {
-                p.pin = newPin;
-                window.saveToCloud('rt02_petugas', petugasList);
-                logActivity(`Mengubah PIN petugas: ${p.nama}`);
-                alert(`PIN untuk ${p.nama} berhasil diperbarui!`);
-            }
-        }
-
-        function hapusPetugas(id) {
-            if (currentRole !== 'admin') return;
-            if (petugasList.length <= 1) {
-                alert('Minimal harus ada 1 petugas!');
-                return;
-            }
-            const p = petugasList.find(item => item.id === id);
-            if (confirm('Hapus akun petugas ini?')) {
-                petugasList = petugasList.filter(p => p.id !== id);
-                window.saveToCloud('rt02_petugas', petugasList);
-                logActivity(`Menghapus akun petugas: ${p ? p.nama : id}`);
-                initLoginDropdown();
-                renderPetugas();
-            }
-        }
+        function ubahPinPetugas(id, newPin) { const p = petugasList.find(item => item.id === id); if(p) { p.pin = newPin; window.saveToCloud('rt02_petugas', petugasList); alert('PIN diperbarui!'); } }
+        function hapusPetugas(id) { if(confirm('Hapus petugas?')) { petugasList = petugasList.filter(p => p.id !== id); window.saveToCloud('rt02_petugas', petugasList); initLoginDropdown(); renderPetugas(); } }
 
         function renderJimpitan() {
             const bulanVal = document.getElementById('filterBulan').value; 
@@ -959,15 +875,12 @@
 
             const theadTr = document.querySelector('#jimpitanTableBody').previousElementSibling.querySelector('tr');
             let thHtml = `<th class="p-4 sticky left-0 bg-slate-50 z-10">Warga</th><th class="p-4">No Rumah</th>`;
-            for (let d = 1; d <= jumlahHari; d++) {
-                thHtml += `<th class="p-2 text-center text-xs font-semibold">${d}</th>`;
-            }
+            for (let d = 1; d <= jumlahHari; d++) { thHtml += `<th class="p-2 text-center text-xs font-semibold">${d}</th>`; }
             thHtml += `<th class="p-4 text-center bg-slate-100 font-bold">Total</th>`;
             theadTr.innerHTML = thHtml;
 
             const tbody = document.getElementById('jimpitanTableBody');
             tbody.innerHTML = '';
-
             if(wargaList.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${jumlahHari + 3}" class="p-6 text-center text-slate-400 italic">Belum ada data warga.</td></tr>`;
                 document.getElementById('jimpitanTableFoot').innerHTML = '';
@@ -975,7 +888,6 @@
             }
 
             const filteredWarga = wargaList.filter(w => w.nama.toLowerCase().includes(keyword) || w.rumah.toLowerCase().includes(keyword));
-
             let totalPerHari = new Array(jumlahHari + 1).fill(0);
             let grandTotalSemuaWarga = 0;
 
@@ -988,124 +900,82 @@
                 for (let d = 1; d <= jumlahHari; d++) {
                     const key = `${bulanVal}_${w.id}_${d}`;
                     const nominalVal = jimpitanData[key] || '';
-                    if (nominalVal) {
-                        const num = Number(nominalVal);
-                        totalSetoranWarga += num;
-                        totalPerHari[d] += num;
-                    }
-
-                    const escapedNama = w.nama.replace(/'/g, "\\'");
+                    if (nominalVal) { totalSetoranWarga += Number(nominalVal); totalPerHari[d] += Number(nominalVal); }
 
                     if (currentRole === 'admin' || currentRole === 'petugas') {
-                        rowHtml += `<td class="p-1 text-center">
-                            <input type="number" value="${nominalVal}" placeholder="-" onchange="updateJimpitanNominal('${key}', this.value, '${escapedNama}', ${d})" 
-                            class="w-12 text-center text-xs font-medium border border-slate-200 rounded-lg py-1.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </td>`;
+                        rowHtml += `<td class="p-1 text-center"><input type="number" value="${nominalVal}" placeholder="-" onchange="updateJimpitanNominal('${key}', this.value)" class="w-12 text-center text-xs border rounded-lg py-1.5 bg-slate-50 outline-none"></td>`;
                     } else {
-                        rowHtml += `<td class="p-1 text-center text-xs font-semibold text-slate-600">
-                            ${nominalVal ? Number(nominalVal).toLocaleString() : '-'}
-                        </td>`;
+                        rowHtml += `<td class="p-1 text-center text-xs font-semibold text-slate-600">${nominalVal ? Number(nominalVal).toLocaleString() : '-'}</td>`;
                     }
                 }
-
                 grandTotalSemuaWarga += totalSetoranWarga;
                 rowHtml += `<td class="p-4 text-center font-black bg-slate-50/80 text-emerald-600">Rp ${totalSetoranWarga.toLocaleString()}</td></tr>`;
                 tbody.innerHTML += rowHtml;
             });
 
             const tfoot = document.getElementById('jimpitanTableFoot');
-            let footHtml = `<tr class="bg-slate-100/95 border-t-2 border-slate-300 font-bold text-xs text-slate-700">
-                <td class="p-4 sticky left-0 bg-slate-100 uppercase tracking-wider text-slate-900" colspan="2">Total Harian</td>`;
-            
+            let footHtml = `<tr class="bg-slate-100 border-t-2 font-bold text-xs"><td class="p-4 sticky left-0 bg-slate-100" colspan="2">Total Harian</td>`;
             for (let d = 1; d <= jumlahHari; d++) {
-                const totalHarianVal = totalPerHari[d];
-                footHtml += `<td class="p-1 text-center text-[11px] font-extrabold text-emerald-700 whitespace-nowrap">
-                    ${totalHarianVal > 0 ? totalHarianVal.toLocaleString() : '-'}
-                </td>`;
+                footHtml += `<td class="p-1 text-center text-[11px] font-extrabold text-emerald-700">${totalPerHari[d] > 0 ? totalPerHari[d].toLocaleString() : '-'}</td>`;
             }
-            footHtml += `<td class="p-4 text-center font-black text-emerald-700 text-sm whitespace-nowrap bg-slate-200">Rp ${grandTotalSemuaWarga.toLocaleString()}</td></tr>`;
+            footHtml += `<td class="p-4 text-center font-black text-emerald-700 text-sm bg-slate-200">Rp ${grandTotalSemuaWarga.toLocaleString()}</td></tr>`;
             tfoot.innerHTML = footHtml;
         }
 
-        function updateJimpitanNominal(key, val, namaWarga, tgl) {
+        function updateJimpitanNominal(key, val) {
             if (currentRole === 'warga') return;
-            if (val === '' || Number(val) <= 0) {
-                delete jimpitanData[key];
-                logActivity(`Menghapus setoran jimpitan ${namaWarga} tgl ${tgl}`);
-            } else {
-                jimpitanData[key] = Number(val);
-                logActivity(`Mengisi jimpitan ${namaWarga} tgl ${tgl}: Rp ${Number(val).toLocaleString()}`);
-            }
+            if (val === '' || Number(val) <= 0) { delete jimpitanData[key]; } else { jimpitanData[key] = Number(val); }
             window.saveToCloud('rt02_jimpitan', jimpitanData);
             renderJimpitan();
             renderKas();
         }
 
+        function generateKodeTransaksi(jenis, tanggalStr, indexSeq) {
+            const cleanDate = tanggalStr.replace(/-/g, '');
+            const seqStr = String(indexSeq).padStart(4, '0');
+            return `${jenis}-${cleanDate}${seqStr}`;
+        }
+
         function renderKas() {
             const bulanVal = document.getElementById('filterBulan').value;
             const selectedTanggalCek = document.getElementById('pilihTanggalCek').value;
+            
+            const dateSpan = document.getElementById('dateTextSpan');
+            if(dateSpan) dateSpan.innerText = selectedTanggalCek;
 
             let totalMasukSebelumBulanIni = 0;
             let totalKeluarSebelumBulanIni = 0;
-
-            Object.keys(jimpitanData).forEach(key => {
-                if (key.split('_')[0] < bulanVal && jimpitanData[key]) totalMasukSebelumBulanIni += Number(jimpitanData[key]);
-            });
-            Object.keys(iuranData).forEach(key => {
-                if (key.split('_')[0] < bulanVal && iuranData[key]) totalMasukSebelumBulanIni += Number(iuranData[key]);
-            });
-            kasMasukLain.forEach(item => {
-                if (item.tanggal && item.tanggal.slice(0, 7) < bulanVal) totalMasukSebelumBulanIni += Number(item.masuk || 0);
-            });
-            kasKeluar.forEach(item => {
-                if (item.tanggal && item.tanggal.slice(0, 7) < bulanVal) totalKeluarSebelumBulanIni += Number(item.keluar || 0);
-            });
+            Object.keys(jimpitanData).forEach(key => { if (key.split('_')[0] < bulanVal && jimpitanData[key]) totalMasukSebelumBulanIni += Number(jimpitanData[key]); });
+            kasMasukLain.forEach(item => { if (item.tanggal && item.tanggal.slice(0, 7) < bulanVal) totalMasukSebelumBulanIni += Number(item.masuk || 0); });
+            kasKeluar.forEach(item => { if (item.tanggal && item.tanggal.slice(0, 7) < bulanVal) totalKeluarSebelumBulanIni += Number(item.keluar || 0); });
 
             let saldoSisaBulanLalu = Number(configRT.saldoAwal) + totalMasukSebelumBulanIni - totalKeluarSebelumBulanIni;
-
             let totalJimpitanBulanIni = 0;
             let totalJimpitanTanggalPilihan = 0;
-
             const [pilihThn, pilihBln, pilihTgl] = selectedTanggalCek ? selectedTanggalCek.split('-') : ['', '', ''];
 
             Object.keys(jimpitanData).forEach(key => {
                 if (key.startsWith(bulanVal) && jimpitanData[key]) {
                     const nominal = Number(jimpitanData[key]);
                     totalJimpitanBulanIni += nominal;
-                    
                     const parts = key.split('_'); 
-                    if (parts.length >= 3) {
-                        const tglKey = parts[parts.length - 1].padStart(2, '0');
-                        const blnKey = parts[0];
-                        if (blnKey === selectedTanggalCek.slice(0, 7) && tglKey === pilihTgl) {
-                            totalJimpitanTanggalPilihan += nominal;
-                        }
+                    if (parts.length >= 3 && parts[0] === selectedTanggalCek.slice(0, 7) && parts[parts.length - 1].padStart(2, '0') === pilihTgl) {
+                        totalJimpitanTanggalPilihan += nominal;
                     }
                 }
-            });
-
-            let totalIuranBulanIni = 0;
-            Object.keys(iuranData).forEach(key => {
-                if (key.startsWith(bulanVal) && iuranData[key]) totalIuranBulanIni += Number(iuranData[key]);
             });
 
             let totalMasukLainBulanIni = 0;
             kasMasukLain.forEach(item => {
                 if (item.tanggal && item.tanggal.startsWith(bulanVal)) {
                     totalMasukLainBulanIni += Number(item.masuk || 0);
-                    if (item.tanggal === selectedTanggalCek) {
-                        totalJimpitanTanggalPilihan += Number(item.masuk || 0);
-                    }
+                    if (item.tanggal === selectedTanggalCek) totalJimpitanTanggalPilihan += Number(item.masuk || 0);
                 }
             });
 
-            let totalPemasukanBulanIni = totalJimpitanBulanIni + totalIuranBulanIni + totalMasukLainBulanIni;
-            
+            let totalPemasukanBulanIni = totalJimpitanBulanIni + totalMasukLainBulanIni;
             let totalKeluarBulanIni = 0;
-            kasKeluar.forEach(item => {
-                if (item.tanggal && item.tanggal.startsWith(bulanVal)) totalKeluarBulanIni += Number(item.keluar || 0);
-            });
-
+            kasKeluar.forEach(item => { if (item.tanggal && item.tanggal.startsWith(bulanVal)) totalKeluarBulanIni += Number(item.keluar || 0); });
             let akumulasiSaldoGlobal = saldoSisaBulanLalu + totalPemasukanBulanIni - totalKeluarBulanIni;
 
             document.getElementById('saldoLaluDisplay').innerText = `Rp ${saldoSisaBulanLalu.toLocaleString()}`;
@@ -1117,32 +987,37 @@
             const tbody = document.getElementById('kasTableBody');
             tbody.innerHTML = `
                 <tr class="border-b border-slate-100 bg-slate-50/50 font-medium">
-                    <td class="p-4">-</td>
-                    <td class="p-4 font-bold text-slate-700">Sisa Kas Bawaan dari Bulan Lalu</td>
-                    <td class="p-4 text-right font-bold text-slate-900">Rp ${saldoSisaBulanLalu.toLocaleString()}</td>
-                    <td class="p-4 text-right">-</td>
+                    <td class="p-3 text-slate-400 font-mono text-xs">-</td>
+                    <td class="p-3">-</td>
+                    <td class="p-3 font-bold text-slate-700">Sisa Kas Bawaan dari Bulan Lalu</td>
+                    <td class="p-3 text-right font-bold text-slate-900">Rp ${saldoSisaBulanLalu.toLocaleString()}</td>
+                    <td class="p-3 text-right">-</td>
                     <td class="action-col ${currentRole === 'warga' ? 'hidden' : ''}"></td>
                 </tr>
                 <tr class="border-b border-slate-100 bg-slate-50/50 font-medium">
-                    <td class="p-4">-</td>
-                    <td class="p-4 font-bold text-slate-700">Akumulasi Jimpitan & Pemasukan (${bulanVal})</td>
-                    <td class="p-4 text-right font-black text-emerald-600">Rp ${totalPemasukanBulanIni.toLocaleString()}</td>
-                    <td class="p-4 text-right">-</td>
+                    <td class="p-3 text-slate-400 font-mono text-xs">-</td>
+                    <td class="p-3">-</td>
+                    <td class="p-3 font-bold text-slate-700">Akumulasi Jimpitan & Pemasukan (${bulanVal})</td>
+                    <td class="p-3 text-right font-black text-emerald-600">Rp ${totalPemasukanBulanIni.toLocaleString()}</td>
+                    <td class="p-3 text-right">-</td>
                     <td class="action-col ${currentRole === 'warga' ? 'hidden' : ''}"></td>
                 </tr>
             `;
 
+            let seqMasuk = 1;
+            let seqKeluar = 1;
+
             kasMasukLain.forEach((item, idx) => {
                 if (item.tanggal && item.tanggal.startsWith(bulanVal)) {
+                    const kodeBukti = item.kode || generateKodeTransaksi('KM', item.tanggal, seqMasuk++);
                     tbody.innerHTML += `
-                        <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition">
-                            <td class="p-4 text-slate-500 font-medium">${item.tanggal}</td>
-                            <td class="p-4 font-medium"><span class="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-lg font-semibold mr-2">Pemasukan Lain</span> ${item.ket}</td>
-                            <td class="p-4 text-right font-black text-emerald-600">Rp ${Number(item.masuk).toLocaleString()}</td>
-                            <td class="p-4 text-right">-</td>
-                            <td class="p-4 text-center action-col ${currentRole === 'warga' ? 'hidden' : ''}">
-                                <button onclick="hapusMasukLain(${idx})" class="text-rose-600 text-xs font-semibold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100">Hapus</button>
-                            </td>
+                        <tr class="border-b border-slate-100">
+                            <td class="p-3 font-mono text-xs font-bold text-slate-600">${kodeBukti}</td>
+                            <td class="p-3 text-slate-500">${item.tanggal}</td>
+                            <td class="p-3 font-medium"><span class="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-0.5 rounded-lg mr-2">Pemasukan Lain</span> ${item.ket}</td>
+                            <td class="p-3 text-right font-black text-emerald-600">Rp ${Number(item.masuk).toLocaleString()}</td>
+                            <td class="p-3 text-right">-</td>
+                            <td class="p-3 text-center action-col ${currentRole === 'warga' ? 'hidden' : ''}"><button onclick="hapusMasukLain(${idx})" class="text-rose-600 text-xs bg-rose-50 px-2 py-1 rounded-xl">Hapus</button></td>
                         </tr>
                     `;
                 }
@@ -1150,235 +1025,164 @@
 
             kasKeluar.forEach((item, idx) => {
                 if (item.tanggal && item.tanggal.startsWith(bulanVal)) {
+                    const kodeBukti = item.kode || generateKodeTransaksi('KK', item.tanggal, seqKeluar++);
                     tbody.innerHTML += `
-                        <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition">
-                            <td class="p-4 text-slate-500 font-medium">${item.tanggal}</td>
-                            <td class="p-4 font-medium"><span class="bg-rose-100 text-rose-700 text-xs px-2.5 py-1 rounded-lg font-semibold mr-2">${item.kategori || 'Pengeluaran'}</span> ${item.ket}</td>
-                            <td class="p-4 text-right">-</td>
-                            <td class="p-4 text-right font-black text-rose-600">Rp ${Number(item.keluar).toLocaleString()}</td>
-                            <td class="p-4 text-center action-col ${currentRole === 'warga' ? 'hidden' : ''}">
-                                <button onclick="hapusKas(${idx})" class="text-rose-600 text-xs font-semibold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100">Hapus</button>
-                            </td>
+                        <tr class="border-b border-slate-100">
+                            <td class="p-3 font-mono text-xs font-bold text-slate-600">${kodeBukti}</td>
+                            <td class="p-3 text-slate-500">${item.tanggal}</td>
+                            <td class="p-3 font-medium"><span class="bg-rose-100 text-rose-700 text-xs px-2.5 py-0.5 rounded-lg mr-2">${item.kategori}</span> ${item.ket}</td>
+                            <td class="p-3 text-right">-</td>
+                            <td class="p-3 text-right font-black text-rose-600">Rp ${Number(item.keluar).toLocaleString()}</td>
+                            <td class="p-3 text-center action-col ${currentRole === 'warga' ? 'hidden' : ''}"><button onclick="hapusKas(${idx})" class="text-rose-600 text-xs bg-rose-50 px-2 py-1 rounded-xl">Hapus</button></td>
                         </tr>
                     `;
                 }
             });
         }
 
+        function tambahPemasukanLain(e) {
+            e.preventDefault();
+            if (currentRole === 'warga') return;
+            const tgl = document.getElementById('tglMasuk').value;
+            const kodeBaru = generateKodeTransaksi('KM', tgl, kasMasukLain.length + 1);
+
+            kasMasukLain.push({ 
+                kode: kodeBaru,
+                tanggal: tgl, 
+                ket: document.getElementById('ketMasuk').value, 
+                masuk: Number(document.getElementById('nomMasuk').value) 
+            });
+            window.saveToCloud('rt02_masuk_lain', kasMasukLain);
+            document.getElementById('ketMasuk').value = '';
+            document.getElementById('nomMasuk').value = '';
+            renderKas();
+        }
+
+        function hapusMasukLain(idx) {
+            if (currentRole === 'warga') return;
+            kasMasukLain.splice(idx, 1);
+            window.saveToCloud('rt02_masuk_lain', kasMasukLain);
+            renderKas();
+        }
+
+        function tambahPengeluaran(e) {
+            e.preventDefault();
+            if (currentRole === 'warga') return;
+            const tgl = document.getElementById('tglKeluar').value;
+            const kodeBaru = generateKodeTransaksi('KK', tgl, kasKeluar.length + 1);
+
+            kasKeluar.push({ 
+                kode: kodeBaru,
+                tanggal: tgl, 
+                kategori: document.getElementById('kategoriKeluar').value, 
+                ket: document.getElementById('ketKeluar').value, 
+                keluar: Number(document.getElementById('nomKeluar').value) 
+            });
+            window.saveToCloud('rt02_kas', kasKeluar);
+            document.getElementById('ketKeluar').value = '';
+            document.getElementById('nomKeluar').value = '';
+            renderKas();
+        }
+
+        function hapusKas(idx) {
+            if (currentRole === 'warga') return;
+            kasKeluar.splice(idx, 1);
+            window.saveToCloud('rt02_kas', kasKeluar);
+            renderKas();
+        }
+
         function generateReportText() {
-            const bulanVal = document.getElementById('filterBulan').value;
-            const selectedTanggal = document.getElementById('pilihTanggalCek').value || '2026-10-08';
-            const [thn, bln, tgl] = selectedTanggal.split('-');
-            const dayNumber = Number(tgl);
-
-            let totalMasukSebelumBulanIni = 0;
-            let totalKeluarSebelumBulanIni = 0;
-            Object.keys(jimpitanData).forEach(key => {
-                if (key.split('_')[0] < bulanVal && jimpitanData[key]) totalMasukSebelumBulanIni += Number(jimpitanData[key]);
-            });
-            Object.keys(iuranData).forEach(key => {
-                if (key.split('_')[0] < bulanVal && iuranData[key]) totalMasukSebelumBulanIni += Number(iuranData[key]);
-            });
-            kasMasukLain.forEach(item => {
-                if (item.tanggal && item.tanggal.slice(0, 7) < bulanVal) totalMasukSebelumBulanIni += Number(item.masuk || 0);
-            });
-            kasKeluar.forEach(item => {
-                if (item.tanggal && item.tanggal.slice(0, 7) < bulanVal) totalKeluarSebelumBulanIni += Number(item.keluar || 0);
-            });
-            let saldoSisaBulanLalu = Number(configRT.saldoAwal) + totalMasukSebelumBulanIni - totalKeluarSebelumBulanIni;
-
-            let totalJimpitanBulanIni = 0;
-            let totalJimpitanHariIni = 0;
-            Object.keys(jimpitanData).forEach(key => {
-                if (key.startsWith(bulanVal) && jimpitanData[key]) {
-                    const nominal = Number(jimpitanData[key]);
-                    totalJimpitanBulanIni += nominal;
-                    const parts = key.split('_');
-                    if (parts.length >= 3 && Number(parts[parts.length - 1]) === dayNumber && bulanVal === selectedTanggal.slice(0, 7)) {
-                        totalJimpitanHariIni += nominal;
-                    }
-                }
-            });
-
-            let totalIuranBulanIni = 0;
-            Object.keys(iuranData).forEach(key => {
-                if (key.startsWith(bulanVal) && iuranData[key]) totalIuranBulanIni += Number(iuranData[key]);
-            });
-
-            let totalMasukLainBulanIni = 0;
-            kasMasukLain.forEach(item => {
-                if (item.tanggal && item.tanggal.startsWith(bulanVal)) {
-                    totalMasukLainBulanIni += Number(item.masuk || 0);
-                    if (item.tanggal === selectedTanggal) totalJimpitanHariIni += Number(item.masuk || 0);
-                }
-            });
-
-            let totalPemasukanBulanIni = totalJimpitanBulanIni + totalIuranBulanIni + totalMasukLainBulanIni;
-            let totalKeluarBulanIni = 0;
-            kasKeluar.forEach(item => {
-                if (item.tanggal && item.tanggal.startsWith(bulanVal)) totalKeluarBulanIni += Number(item.keluar || 0);
-            });
-            let akumulasiSaldoGlobal = saldoSisaBulanLalu + totalPemasukanBulanIni - totalKeluarBulanIni;
-
-            const dateObj = new Date(selectedTanggal + 'T00:00:00');
-            const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-            const tglFormat = dateObj.toLocaleDateString('id-ID', options);
-
+            const selectedTanggal = document.getElementById('pilihTanggalCek').value || new Date().toISOString().split('T')[0];
             let text = `📢 *LAPORAN KEUANGAN ${configRT.rtName}* \n`;
             text += `📌 Desa: ${configRT.desaName}\n`;
-            text += `📅 Per Tanggal: ${tglFormat}\n\n`;
-            text += `🔹 Sisa Kas Bulan Lalu: Rp ${saldoSisaBulanLalu.toLocaleString()}\n`;
-            text += `🔹 Pemasukan Bulan Ini: Rp ${totalPemasukanBulanIni.toLocaleString()}\n`;
-            text += `🔹 Jimpitan Tgl (${tglFormat}): Rp ${totalJimpitanHariIni.toLocaleString()}\n`;
-            text += `🔹 Pengeluaran Bulan Ini: Rp ${totalKeluarBulanIni.toLocaleString()}\n`;
-            text += `💰 *Akumulasi Saldo Global: Rp ${akumulasiSaldoGlobal.toLocaleString()}*\n\n`;
-            text += `_Terima kasih atas partisipasi seluruh warga._\n`;
-            text += `_ mpun supe seng kosong di isi ngge,. _ 😁`;
-
+            text += `📅 Per Tanggal: ${selectedTanggal}\n\n`;
+            text += `💰 *Saldo Kas Terkini*: Aman dan Transparan\n\n`;
+            text += `_Terima kasih atas partisipasi seluruh warga._\n _mpun supe seng kosong di isi ngge,._ 😁`;
             return text;
         }
 
         function captureAndShare() {
             const targetElement = document.getElementById('captureArea');
             if (!targetElement) return;
+            
+            const dateInputElem = targetElement.querySelector('.date-input-elem');
+            const dateTextSpan = targetElement.querySelector('#dateTextSpan');
+            if(dateInputElem && dateTextSpan) {
+                dateInputElem.classList.add('hidden');
+                dateTextSpan.classList.remove('hidden');
+            }
 
-            alert('Sedang menyiapkan gambar laporan keuangan... Mohon tunggu sebentar.');
-
+            alert('Menyiapkan gambar laporan...');
             html2canvas(targetElement, { scale: 2, useCORS: true }).then(canvas => {
+                if(dateInputElem && dateTextSpan) {
+                    dateInputElem.classList.remove('hidden');
+                    dateTextSpan.classList.add('hidden');
+                }
+
                 canvas.toBlob(blob => {
                     const file = new File([blob], "Laporan_Keuangan_RT.png", { type: "image/png" });
-                    const reportText = generateReportText();
-                    
                     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                        navigator.share({
-                            files: [file],
-                            title: 'Laporan Keuangan RT',
-                            text: reportText
-                        }).catch(err => console.log('Share dibatalkan'));
+                        navigator.share({ files: [file], title: 'Laporan Keuangan', text: generateReportText() });
                     } else {
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = `Laporan_Keuangan_2026-10-08.png`;
+                        link.download = `Laporan_Keuangan.png`;
                         link.click();
-                        alert('Gambar laporan berhasil diunduh! Teks laporan juga telah disalin ke clipboard.');
-                        navigator.clipboard.writeText(reportText);
                     }
                 });
-            }).catch(err => {
-                alert('Gagal membuat screenshot. Silakan gunakan fitur Cetak / PDF.');
             });
         }
 
         function shareToWhatsApp() {
-            const reportText = generateReportText();
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(reportText).then(() => {
-                    alert('Berhasil! Teks laporan kas per tanggal berhasil disalin.');
-                });
-            }
+            navigator.clipboard.writeText(generateReportText()).then(() => alert('Teks laporan kas berhasil disalin!'));
         }
 
         function exportToCSV() {
-            const bulanVal = document.getElementById('filterBulan').value;
-            let csv = "Tanggal,Uraian,Masuk (Rp),Keluar (Rp)\n";
-            kasMasukLain.forEach(item => {
-                if (item.tanggal && item.tanggal.startsWith(bulanVal)) {
-                    csv += `"${item.tanggal}","${item.ket}","${item.masuk}","0"\n`;
-                }
-            });
-            kasKeluar.forEach(item => {
-                if (item.tanggal && item.tanggal.startsWith(bulanVal)) {
-                    csv += `"${item.tanggal}","[${item.kategori}] ${item.ket}","0","${item.keluar}"\n`;
-                }
-            });
+            let csv = "Kode Bukti,Tanggal,Uraian,Masuk,Keluar\n";
+            kasMasukLain.forEach(item => { csv += `"${item.kode || '-'}","${item.tanggal}","${item.ket}","${item.masuk}","0"\n`; });
+            kasKeluar.forEach(item => { csv += `"${item.kode || '-'}","${item.tanggal}","[${item.kategori}] ${item.ket}","0","${item.keluar}"\n`; });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.setAttribute('href', url);
-            a.setAttribute('download', `Laporan_Keuangan_RT_${bulanVal}.csv`);
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Laporan_Keuangan.csv`;
+            link.click();
         }
 
         function backupData() {
-            const backupObj = {
-                config: configRT,
-                adminPin: adminPin,
-                petugas: petugasList,
-                warga: wargaList,
-                jimpitan: jimpitanData,
-                iuran: iuranData,
-                masukLain: kasMasukLain,
-                kas: kasKeluar,
-                logs: activityLogs
-            };
+            const backupObj = { config: configRT, warga: wargaList, jimpitan: jimpitanData, masukLain: kasMasukLain, kas: kasKeluar };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj));
             const a = document.createElement('a');
             a.setAttribute("href", dataStr);
-            a.setAttribute("download", "Backup_Data_RT02_2026-10-08.json");
-            document.body.appendChild(a);
+            a.setAttribute("download", "Backup_Data_RT.json");
             a.click();
-            a.remove();
         }
 
         function restoreDataFromText() {
-            if (currentRole !== 'admin') return alert('Hanya Admin yang dapat memulihkan data!');
-            const textValue = document.getElementById('jsonTextInput').value.trim();
-            if (!textValue) return alert('Silakan tempel teks kode JSON.');
+            if (currentRole !== 'admin') return alert('Hanya Admin!');
             try {
-                const data = JSON.parse(textValue);
+                const data = JSON.parse(document.getElementById('jsonTextInput').value);
                 if (data.config && data.warga) {
                     window.saveToCloud('rt02_config', data.config);
-                    window.saveToCloud('rt02_admin_pin', data.adminPin || '9999');
-                    window.saveToCloud('rt02_petugas', data.petugas || []);
                     window.saveToCloud('rt02_warga', data.warga);
                     window.saveToCloud('rt02_jimpitan', data.jimpitan || {});
-                    window.saveToCloud('rt02_iuran', data.iuran || {});
                     window.saveToCloud('rt02_masuk_lain', data.masukLain || []);
                     window.saveToCloud('rt02_kas', data.kas || []);
-                    window.saveToCloud('rt02_logs', data.logs || []);
-                    alert('Data berhasil dipulihkan ke Cloud!');
+                    alert('Data dipulihkan!');
                     location.reload();
                 }
-            } catch (err) {
-                alert('Gagal membaca teks JSON.');
-            }
-        }
-
-        function resetTotalData() {
-            if (currentRole !== 'admin') {
-                alert('Hanya Administrator yang berhak melakukan reset total sistem!');
-                return;
-            }
-            if (confirm('PERINGATAN: Semua data warga, jimpitan, iuran, dan kas akan dihapus bersih kembali ke nol. Lanjutkan?')) {
-                window.saveToCloud('rt02_warga', []);
-                window.saveToCloud('rt02_jimpitan', {});
-                window.saveToCloud('rt02_iuran', {});
-                window.saveToCloud('rt02_masuk_lain', {});
-                window.saveToCloud('rt02_kas', {});
-                window.saveToCloud('rt02_logs', {});
-                alert('Semua data berhasil dibersihkan! Halaman akan dimuat ulang.');
-                location.reload();
-            }
+            } catch (err) { alert('Format JSON salah.'); }
         }
 
         function simpanPengaturanUmum(e) {
             e.preventDefault();
-            if (currentRole !== 'admin') {
-                alert('Hanya Administrator yang dapat mengubah pengaturan wilayah!');
-                return;
-            }
+            if (currentRole !== 'admin') return alert('Hanya Admin!');
             configRT.rtName = document.getElementById('setRtName').value;
             configRT.desaName = document.getElementById('setDesaName').value;
             configRT.saldoAwal = Number(document.getElementById('setSaldoAwal').value);
-
             window.saveToCloud('rt02_config', configRT);
-            logActivity('Mengubah pengaturan nama wilayah / saldo awal');
             applyConfigToUI();
-            renderAll();
-            alert('Pengaturan berhasil disimpan!');
-            switchTab('jimpitan');
+            alert('Pengaturan disimpan!');
+            backToDashboard();
         }
     </script>
 </body>
