@@ -1090,17 +1090,31 @@
             window.saveToCloud('rt02_kas', kasKeluar);
             renderKas();
         }
-
         function generateReportText() {
             const selectedTanggal = document.getElementById('pilihTanggalCek').value || new Date().toISOString().split('T')[0];
+    
+        // Mengambil nilai angka langsung dari elemen tampilan kas
+            const saldoLalu = document.getElementById('saldoLaluDisplay').innerText;
+            const totalMasuk = document.getElementById('totalJimpitanDisplay').innerText;
+            const jimpitanHariIni = document.getElementById('totalJimpitanHariIniDisplay').innerText;
+            const totalKeluar = document.getElementById('totalKeluarDisplay').innerText;
+            const saldoAkhir = document.getElementById('saldoAkhirDisplay').innerText;
+
             let text = `📢 *LAPORAN KEUANGAN ${configRT.rtName}* \n`;
             text += `📌 Desa: ${configRT.desaName}\n`;
             text += `📅 Per Tanggal: ${selectedTanggal}\n\n`;
-            text += `💰 *Saldo Kas Terkini*: Aman dan Transparan\n\n`;
-            text += `_Terima kasih atas partisipasi seluruh warga._\n _mpun supe seng kosong di isi ngge,._ 😁`;
+            text += `🔹 Sisa Kas Bulan Lalu: ${saldoLalu}\n`;
+            text += `🔹 Pemasukan Bulan Ini: ${totalMasuk}\n`;
+            text += `🔹 Jimpitan Tgl (${selectedTanggal}): ${jimpitanHariIni}\n`;
+            text += `🔹 Pengeluaran Bulan Ini: ${totalKeluar}\n`;
+            text += `💰 *Akumulasi Saldo Global: ${saldoAkhir}*\n\n`;
+            text += `_Terima kasih atas partisipasi seluruh warga._\n`;
+                text += `_Mpun supe seng kosong diisi nggeh._ 😁`;
+    
             return text;
         }
 
+  
         function captureAndShare() {
             const targetElement = document.getElementById('captureArea');
             if (!targetElement) return;
